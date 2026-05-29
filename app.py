@@ -2,7 +2,6 @@ import base64
 from pathlib import Path
 
 import streamlit as st
-from streamlit_navigation_bar import st_navbar
 
 
 # ============================================================
@@ -36,32 +35,11 @@ SALA_BUTTON_CANDIDATES = [
 PAGE_ICON = str(LOGO_PNG_PATH) if LOGO_PNG_PATH.exists() else "🍎"
 
 st.set_page_config(
-    page_title="PET-Saúde GT-6",
+    page_title="Sistema de Saúde Alimentar e Nutricional - GT6",
     page_icon=PAGE_ICON,
     layout="wide",
     initial_sidebar_state="collapsed",
 )
-
-
-# ============================================================
-# MAPA DE PÁGINAS
-# ============================================================
-
-PAGE_HOME = "🏠 Início"
-PAGE_SUBMETER = "📊 Submeter Dados"
-PAGE_SALA = "📈 Sala de Situação Alimentar"
-
-SLUG_TO_PAGE = {
-    "inicio": PAGE_HOME,
-    "submeter-dados": PAGE_SUBMETER,
-    "sala-situacao": PAGE_SALA,
-}
-
-PAGE_TO_SLUG = {
-    PAGE_HOME: "inicio",
-    PAGE_SUBMETER: "submeter-dados",
-    PAGE_SALA: "sala-situacao",
-}
 
 
 # ============================================================
@@ -71,7 +49,6 @@ PAGE_TO_SLUG = {
 def load_css() -> None:
     """
     Carrega o CSS externo do projeto, se existir.
-    Evita quebrar o app caso o arquivo style.css não seja encontrado.
     """
     if STYLE_PATH.exists():
         with open(STYLE_PATH, "r", encoding="utf-8") as f:
@@ -81,7 +58,6 @@ def load_css() -> None:
 def file_to_base64(file_path: Path) -> str:
     """
     Converte um arquivo local para base64.
-    Usado para imagens de fundo e botões-imagem.
     """
     with open(file_path, "rb") as file:
         return base64.b64encode(file.read()).decode("utf-8")
@@ -105,11 +81,46 @@ def get_image_mime_type(image_path: Path) -> str:
     return "image/png"
 
 
+def safe_image(image_path: Path, width: int | None = None) -> None:
+    """
+    Renderiza imagem somente se o arquivo existir.
+    """
+    if image_path.exists():
+        st.image(str(image_path), width=width)
+
+
+def find_existing_file(candidates: list[Path]) -> Path | None:
+    """
+    Retorna o primeiro arquivo existente dentro da lista de candidatos.
+    """
+    for file_path in candidates:
+        if file_path.exists():
+            return file_path
+
+    return None
+
+
+def get_header_logo_path() -> Path | None:
+    """
+    Prioriza logo SVG para o cabeçalho.
+    Caso não exista, usa PNG.
+    """
+    if LOGO_SVG_PATH.exists():
+        return LOGO_SVG_PATH
+
+    if LOGO_PNG_PATH.exists():
+        return LOGO_PNG_PATH
+
+    return None
+
+
 def apply_global_styles() -> None:
     """
-    CSS global mínimo complementar.
-    O estilo principal deve ficar no style.css.
-    Aqui entram ajustes do fundo e dos botões-imagem.
+    CSS global do sistema:
+    - fundo com assets/fundo.png;
+    - cabeçalho institucional;
+    - botões-imagem;
+    - ajustes de clique.
     """
 
     if FUNDO_PATH.exists():
@@ -132,6 +143,7 @@ def apply_global_styles() -> None:
 
             [data-testid="stHeader"] {{
                 background: transparent !important;
+                pointer-events: none !important;
             }}
 
             .main {{
@@ -150,6 +162,12 @@ def apply_global_styles() -> None:
         <style>
             {background_css}
 
+            .block-container {{
+                padding-top: 1.4rem !important;
+                background: transparent !important;
+                max-width: 1180px !important;
+            }}
+
             div[data-testid="stHeading"] {{
                 text-align: center !important;
             }}
@@ -159,9 +177,36 @@ def apply_global_styles() -> None:
                 text-align: center !important;
             }}
 
-            .block-container {{
-                padding-top: 2rem;
-                background: transparent !important;
+            .app-header {{
+                width: 100%;
+                min-height: 78px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 22px;
+                padding: 12px 28px;
+                margin: 0 auto 2.3rem auto;
+                border-radius: 0 0 26px 26px;
+                background: linear-gradient(90deg, #049149 0%, #5480a8 56%, #6d80ac 100%);
+                border-bottom: 4px solid #f4d207;
+                box-shadow: 0 10px 28px rgba(4, 145, 73, 0.20);
+            }}
+
+            .app-header-logo {{
+                height: 56px;
+                width: auto;
+                object-fit: contain;
+                display: block;
+            }}
+
+            .app-header-title {{
+                color: #ffffff;
+                font-size: 1.45rem;
+                font-weight: 800;
+                letter-spacing: -0.02em;
+                line-height: 1.2;
+                text-align: center;
+                text-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
             }}
 
             .image-action-wrapper {{
@@ -171,6 +216,9 @@ def apply_global_styles() -> None:
                 align-items: center;
                 margin-top: 0.5rem;
                 margin-bottom: 0.5rem;
+                position: relative !important;
+                z-index: 999999 !important;
+                pointer-events: auto !important;
             }}
 
             .image-action-button {{
@@ -181,7 +229,14 @@ def apply_global_styles() -> None:
                 text-decoration: none !important;
                 transition: all 0.28s ease;
                 filter: drop-shadow(0 10px 18px rgba(4, 145, 73, 0.18));
-                cursor: pointer;
+                cursor: pointer !important;
+                position: relative !important;
+                z-index: 1000000 !important;
+                pointer-events: auto !important;
+            }}
+
+            .image-action-button-submeter-dados {{
+                max-width: 560px !important;
             }}
 
             .image-action-button-sala-situacao {{
@@ -205,6 +260,10 @@ def apply_global_styles() -> None:
                 display: block;
                 border-radius: 999px;
                 transition: all 0.28s ease;
+                cursor: pointer !important;
+                pointer-events: auto !important;
+                position: relative !important;
+                z-index: 1000001 !important;
             }}
 
             .image-action-button:hover img {{
@@ -227,6 +286,10 @@ def apply_global_styles() -> None:
                 box-shadow: 0 12px 32px rgba(84, 128, 168, 0.16);
                 transition: all 0.25s ease;
                 text-decoration: none !important;
+                cursor: pointer !important;
+                position: relative !important;
+                z-index: 1000000 !important;
+                pointer-events: auto !important;
             }}
 
             .external-button-fallback:hover {{
@@ -237,7 +300,28 @@ def apply_global_styles() -> None:
                 text-decoration: none !important;
             }}
 
+            .footer {{
+                text-align: center;
+                color: #5c6b73;
+                font-size: 14px;
+                padding: 10px;
+            }}
+
             @media (max-width: 900px) {{
+                .app-header {{
+                    gap: 14px;
+                    padding: 12px 18px;
+                    margin-bottom: 1.7rem;
+                }}
+
+                .app-header-logo {{
+                    height: 48px;
+                }}
+
+                .app-header-title {{
+                    font-size: 1.08rem;
+                }}
+
                 .image-action-button {{
                     max-width: 460px;
                 }}
@@ -248,6 +332,20 @@ def apply_global_styles() -> None:
             }}
 
             @media (max-width: 520px) {{
+                .app-header {{
+                    flex-direction: column;
+                    gap: 8px;
+                    padding: 14px;
+                }}
+
+                .app-header-logo {{
+                    height: 46px;
+                }}
+
+                .app-header-title {{
+                    font-size: 1rem;
+                }}
+
                 .image-action-button {{
                     max-width: 340px;
                 }}
@@ -262,55 +360,41 @@ def apply_global_styles() -> None:
     )
 
 
-def safe_image(image_path: Path, width: int | None = None) -> None:
+# ============================================================
+# COMPONENTES
+# ============================================================
+
+def render_header() -> None:
     """
-    Renderiza imagem somente se o arquivo existir.
-    Evita erro em deploy quando algum asset não subir corretamente.
+    Renderiza cabeçalho sem botões de navegação.
+    Apenas logo e título institucional.
     """
-    if image_path.exists():
-        st.image(str(image_path), width=width)
 
+    logo_path = get_header_logo_path()
 
-def find_existing_file(candidates: list[Path]) -> Path | None:
-    """
-    Retorna o primeiro arquivo existente dentro da lista de candidatos.
-    """
-    for file_path in candidates:
-        if file_path.exists():
-            return file_path
+    if logo_path:
+        logo_base64 = file_to_base64(logo_path)
+        logo_mime = get_image_mime_type(logo_path)
 
-    return None
+        logo_html = (
+            f'<img class="app-header-logo" '
+            f'src="data:{logo_mime};base64,{logo_base64}" '
+            f'alt="Logo GT6">'
+        )
+    else:
+        logo_html = ""
 
-
-def image_to_base64(image_path: Path) -> str:
-    """
-    Converte uma imagem local para base64.
-    Permite criar botão-imagem clicável com HTML.
-    """
-    return file_to_base64(image_path)
-
-
-def get_current_page_from_query_params() -> str:
-    """
-    Lê a página atual a partir da URL.
-    Exemplo:
-    ?page=inicio
-    """
-    page_slug = st.query_params.get("page", "inicio")
-
-    if isinstance(page_slug, list):
-        page_slug = page_slug[0] if page_slug else "inicio"
-
-    return SLUG_TO_PAGE.get(page_slug, PAGE_HOME)
-
-
-def set_page(page_name: str) -> None:
-    """
-    Atualiza a página ativa via session_state e query params.
-    """
-    st.session_state["current_page"] = page_name
-    st.query_params["page"] = PAGE_TO_SLUG.get(page_name, "inicio")
-    st.rerun()
+    st.markdown(
+        f"""
+        <div class="app-header">
+            {logo_html}
+            <div class="app-header-title">
+                Sistema de Saúde Alimentar e Nutricional - GT6
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_external_image_button(
@@ -320,11 +404,12 @@ def render_external_image_button(
     css_suffix: str,
 ) -> None:
     """
-    Renderiza um botão baseado em imagem apontando para um sistema externo.
-    Caso a imagem não exista, renderiza um botão HTML simples com o mesmo link.
+    Renderiza um botão baseado em imagem apontando para sistema externo.
     """
+    safe_url = external_url.strip()
+
     if image_path and image_path.exists():
-        image_base64 = image_to_base64(image_path)
+        image_base64 = file_to_base64(image_path)
         image_mime = get_image_mime_type(image_path)
 
         st.markdown(
@@ -332,12 +417,16 @@ def render_external_image_button(
             <div class="image-action-wrapper">
                 <a
                     class="image-action-button image-action-button-{css_suffix}"
-                    href="{external_url}"
+                    href="{safe_url}"
                     target="_blank"
                     rel="noopener noreferrer"
                     title="{fallback_label}"
+                    onclick="window.open('{safe_url}', '_blank', 'noopener,noreferrer'); return false;"
                 >
-                    <img src="data:{image_mime};base64,{image_base64}" alt="{fallback_label}">
+                    <img
+                        src="data:{image_mime};base64,{image_base64}"
+                        alt="{fallback_label}"
+                    >
                 </a>
             </div>
             """,
@@ -349,10 +438,11 @@ def render_external_image_button(
             <div class="image-action-wrapper">
                 <a
                     class="external-button-fallback"
-                    href="{external_url}"
+                    href="{safe_url}"
                     target="_blank"
                     rel="noopener noreferrer"
                     title="{fallback_label}"
+                    onclick="window.open('{safe_url}', '_blank', 'noopener,noreferrer'); return false;"
                 >
                     {fallback_label}
                 </a>
@@ -360,113 +450,6 @@ def render_external_image_button(
             """,
             unsafe_allow_html=True,
         )
-
-
-# ============================================================
-# COMPONENTES
-# ============================================================
-
-def render_navbar() -> str:
-    """
-    Renderiza a navbar principal.
-    Compatível com versões do streamlit-navigation-bar que não aceitam css.
-    """
-
-    pages = [
-        PAGE_HOME,
-        PAGE_SUBMETER,
-        PAGE_SALA,
-    ]
-
-    if "current_page" not in st.session_state:
-        st.session_state["current_page"] = get_current_page_from_query_params()
-
-    styles = {
-        "nav": {
-            "background": "linear-gradient(90deg, #049149 0%, #5480a8 55%, #6d80ac 100%)",
-            "height": "76px",
-            "display": "flex",
-            "align-items": "center",
-            "justify-content": "center",
-            "padding-left": "2rem",
-            "padding-right": "2rem",
-            "border-bottom": "4px solid #f4d207",
-            "box-shadow": "0 8px 28px rgba(4, 145, 73, 0.22)",
-        },
-        "div": {
-            "max-width": "1180px",
-            "width": "100%",
-            "display": "flex",
-            "align-items": "center",
-            "margin": "0 auto",
-        },
-        "ul": {
-            "width": "100%",
-            "display": "flex",
-            "align-items": "center",
-            "justify-content": "center",
-            "gap": "28px",
-        },
-        "li": {
-            "display": "flex",
-            "align-items": "center",
-        },
-        "a": {
-            "text-decoration": "none",
-        },
-        "span": {
-            "color": "white",
-            "font-size": "15.5px",
-            "font-weight": "600",
-            "padding": "12px 18px",
-            "background": "rgba(255,255,255,0.10)",
-            "border": "1px solid rgba(255,255,255,0.20)",
-            "border-radius": "999px",
-            "transition": "all 0.25s ease",
-            "text-decoration": "none",
-            "display": "inline-block",
-        },
-        "hover": {
-            "color": "white",
-            "background-color": "rgba(255,255,255,0.20)",
-            "transform": "translateY(-1px)",
-        },
-        "active": {
-            "color": "#17301f",
-            "background": "#f4d207",
-            "border-color": "#f4d207",
-            "box-shadow": "0 8px 20px rgba(244, 210, 7, 0.26)",
-            "transform": "translateY(-1px)",
-            "letter-spacing": ".5px",
-        },
-        "img": {
-            "height": "58px",
-            "width": "auto",
-            "object-fit": "contain",
-        },
-    }
-
-    logo_path = str(LOGO_SVG_PATH) if LOGO_SVG_PATH.exists() else None
-
-    try:
-        selected_page = st_navbar(
-            pages=pages,
-            logo_path=logo_path,
-            styles=styles,
-            selected=st.session_state["current_page"],
-        )
-    except TypeError:
-        selected_page = st_navbar(
-            pages,
-            logo_path=logo_path,
-            styles=styles,
-        )
-
-    if selected_page:
-        st.session_state["current_page"] = selected_page
-        st.query_params["page"] = PAGE_TO_SLUG.get(selected_page, "inicio")
-
-    return st.session_state["current_page"]
 
 
 def render_footer() -> None:
@@ -493,7 +476,6 @@ def render_footer() -> None:
 def render_team() -> None:
     """
     Renderiza a equipe do GT-6.
-    Mantém os dados centralizados e mais fáceis de editar.
     """
 
     equipe = {
@@ -538,7 +520,7 @@ def render_team() -> None:
 
 
 # ============================================================
-# PÁGINAS
+# PÁGINA PRINCIPAL
 # ============================================================
 
 def render_home() -> None:
@@ -586,66 +568,6 @@ def render_home() -> None:
     render_team()
 
 
-def render_submeter_dados() -> None:
-    """
-    Página interna informativa para submissão de dados.
-    O acesso principal é feito pelo botão externo da página inicial.
-    """
-
-    st.title("Submeter Dados")
-    st.subheader("Sistema externo de coleta de dados")
-
-    st.info(
-        "A submissão de dados é realizada em um sistema externo dedicado."
-    )
-
-    st.markdown(
-        f"""
-        <div class="image-action-wrapper">
-            <a
-                class="external-button-fallback"
-                href="{SUBMETER_DADOS_URL}"
-                target="_blank"
-                rel="noopener noreferrer"
-            >
-                Acessar sistema de Submissão de Dados
-            </a>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_sala_situacao() -> None:
-    """
-    Página interna informativa para a sala de situação.
-    O acesso principal é feito pelo botão externo da página inicial.
-    """
-
-    st.title("Sala de Situação Alimentar")
-    st.subheader("Painel externo de monitoramento")
-
-    st.info(
-        "A Sala de Situação de Saúde Alimentar é acessada em um painel externo dedicado."
-    )
-
-    st.markdown(
-        f"""
-        <div class="image-action-wrapper">
-            <a
-                class="external-button-fallback"
-                href="{SALA_SITUACAO_URL}"
-                target="_blank"
-                rel="noopener noreferrer"
-            >
-                Acessar Sala de Situação Saúde Alimentar
-            </a>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 # ============================================================
 # EXECUÇÃO PRINCIPAL
 # ============================================================
@@ -653,21 +575,8 @@ def render_sala_situacao() -> None:
 def main() -> None:
     load_css()
     apply_global_styles()
-
-    current_page = render_navbar()
-
-    if current_page == PAGE_HOME:
-        render_home()
-
-    elif current_page == PAGE_SUBMETER:
-        render_submeter_dados()
-
-    elif current_page == PAGE_SALA:
-        render_sala_situacao()
-
-    else:
-        render_home()
-
+    render_header()
+    render_home()
     render_footer()
 
 
